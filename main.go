@@ -39,6 +39,6 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Fprintf(w, "Hello %s!\n", name)
+		fmt.Fprintf(w, "Hello there, %s!\n", name)
 	}
 }
