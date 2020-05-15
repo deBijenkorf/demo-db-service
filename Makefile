@@ -3,12 +3,51 @@
 # The release version is controlled from pkg/version
 
 TAG?=latest
-NAME:=podinfo
+APP_NAME:=podinfo
 DOCKER_REPOSITORY:=eu.gcr.io/dbk-ecom-cicd
-DOCKER_IMAGE_NAME:=$(DOCKER_REPOSITORY)/$(NAME)
+DOCKER_IMAGE_NAME:=$(DOCKER_REPOSITORY)/$(APP_NAME)
 GIT_COMMIT:=$(shell git describe --dirty --always)
-VERSION:=$(shell grep 'VERSION' pkg/version/version.go | awk '{ print $$4 }' | tr -d '"')
+GITVER:=$(shell git rev-parse --short=7 HEAD)
+PROJECTVER:=$(shell grep 'VERSION' pkg/version/version.go | awk '{ print $$4 }' | tr -d '"')
+VERSION:=$(PROJECTVER)-$(GITVER)
+NAMESPACE := $(APP_NAME)
+HELM3_CHART_DIR := ./helm3/$(APP_NAME)
+CONTEXT_DBK_DEV:=gke_dbk-ecom-dev_europe-west4_dbk-dev
 EXTRA_RUN_ARGS?=
+
+.PHONY: docker_build
+docker_build:
+	docker build . -t $(DOCKER_IMAGE_NAME):$(VERSION) --no-cache
+	docker push $(DOCKER_IMAGE_NAME):$(VERSION)
+
+.PHONY: export_version
+export_version:
+	printf "VERSION=$(VERSION)\n" > version.txt
+
+.PHONY: ci_build
+ci_build: docker_build export_version
+
+.PHONY: deploy
+deploy:
+	helm3 secrets upgrade --install $(APP_NAME)-$(HELM3_TARGET_ENV) $(HELM3_CHART_DIR) \
+		--values $(HELM3_CHART_DIR)/values.yaml \
+		--set image.tag=$(VERSION) \
+		--namespace $(NAMESPACE) --kube-context $(HELM3_TARGET_CONTEXT)
+
+.PHONY: deploy_sit
+deploy_sit: HELM3_TARGET_ENV = sit
+deploy_sit: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_DEV}
+deploy_sit: deploy
+
+.PHONY: deploy_bau
+deploy_bau: HELM3_TARGET_ENV = bau
+deploy_bau: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_DEV}
+deploy_bau: deploy
+
+.PHONY: deploy_prod
+deploy_prod: HELM3_TARGET_ENV = prod
+deploy_prod: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_PROD}
+deploy_prod: deploy
 
 run:
 	go run -ldflags "-s -w -X github.com/stefanprodan/podinfo/pkg/version.REVISION=$(GIT_COMMIT)" cmd/podinfo/* \
@@ -50,10 +89,7 @@ push-container:
 	docker tag $(DOCKER_IMAGE_NAME):$(VERSION) $(DOCKER_IMAGE_NAME):latest
 	docker push $(DOCKER_IMAGE_NAME):$(VERSION)
 	docker push $(DOCKER_IMAGE_NAME):latest
-	docker tag $(DOCKER_IMAGE_NAME):$(VERSION) quay.io/$(DOCKER_IMAGE_NAME):$(VERSION)
-	docker tag $(DOCKER_IMAGE_NAME):$(VERSION) quay.io/$(DOCKER_IMAGE_NAME):latest
-	docker push quay.io/$(DOCKER_IMAGE_NAME):$(VERSION)
-	docker push quay.io/$(DOCKER_IMAGE_NAME):latest
+
 
 version-set:
 	@next="$(TAG)" && \
