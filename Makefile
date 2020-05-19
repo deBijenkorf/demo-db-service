@@ -29,23 +29,23 @@ ci_build: docker_build export_version
 
 .PHONY: deploy
 deploy:
-	helm3 secrets upgrade --install $(APP_NAME)-$(HELM3_TARGET_ENV) $(HELM3_CHART_DIR) \
+	helm3 secrets upgrade --install $(HELM3_TARGET_RELEASE) $(HELM3_CHART_DIR) \
 		--values $(HELM3_CHART_DIR)/values.yaml \
 		--set image.tag=$(VERSION) \
 		--namespace $(NAMESPACE) --kube-context $(HELM3_TARGET_CONTEXT)
 
 .PHONY: deploy_sit
-deploy_sit: HELM3_TARGET_ENV = sit
+deploy_sit: HELM3_TARGET_RELEASE = $(APP_NAME)-sit
 deploy_sit: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_DEV}
 deploy_sit: deploy
 
 .PHONY: deploy_bau
-deploy_bau: HELM3_TARGET_ENV = bau
+deploy_bau: HELM3_TARGET_RELEASE = $(APP_NAME)-bau
 deploy_bau: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_DEV}
 deploy_bau: deploy
 
 .PHONY: deploy_prod
-deploy_prod: HELM3_TARGET_ENV = prod
+deploy_prod: HELM3_TARGET_RELEASE = $(APP_NAME)-prod
 deploy_prod: HELM3_TARGET_CONTEXT = ${CONTEXT_DBK_PROD}
 deploy_prod: deploy
 
